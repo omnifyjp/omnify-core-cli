@@ -582,6 +582,9 @@ function runDirectGeneration(
     const schemasDir = resolve(basePath, tsConfig.schemasDir ?? 'schemas');
     const enumDir = resolve(basePath, tsConfig.enumDir ?? 'enum');
 
+    // Plugin enums go to node_modules/.omnify/enum (hidden, auto-generated)
+    const pluginEnumDir = resolve(rootDir, 'node_modules/.omnify/enum');
+
     // Calculate enum import prefix (relative path from schemas to enum)
     const enumImportPrefix = relative(schemasDir, enumDir).replace(/\\/g, '/');
 
@@ -594,6 +597,24 @@ function runDirectGeneration(
       mkdirSync(enumDir, { recursive: true });
       logger.debug(`Created directory: ${enumDir}`);
     }
+    if (!existsSync(pluginEnumDir)) {
+      mkdirSync(pluginEnumDir, { recursive: true });
+      logger.debug(`Created directory: ${pluginEnumDir}`);
+    }
+
+    // Create package.json for @omnify/enum alias
+    const omnifyPkgDir = resolve(rootDir, 'node_modules/.omnify');
+    const omnifyPkgJson = resolve(omnifyPkgDir, 'package.json');
+    if (!existsSync(omnifyPkgJson)) {
+      writeFileSync(omnifyPkgJson, JSON.stringify({
+        name: '@omnify/generated',
+        version: '0.0.0',
+        private: true,
+        exports: {
+          './enum/*': './enum/*.js',
+        },
+      }, null, 2));
+    }
 
     // Enable multiLocale if locale config has multiple locales
     const isMultiLocale = config.locale && config.locale.locales && config.locale.locales.length > 1;
@@ -605,11 +626,19 @@ function runDirectGeneration(
       generateRules: tsConfig.generateRules ?? true,
       validationTemplates: tsConfig.validationTemplates,
       enumImportPrefix,
+      pluginEnumImportPrefix: '@omnify/generated/enum',
     });
 
     for (const file of typeFiles) {
       // Determine output directory based on file category
-      const outputDir = file.category === 'enum' ? enumDir : schemasDir;
+      let outputDir: string;
+      if (file.category === 'plugin-enum') {
+        outputDir = pluginEnumDir;
+      } else if (file.category === 'enum') {
+        outputDir = enumDir;
+      } else {
+        outputDir = schemasDir;
+      }
       const filePath = resolve(outputDir, file.filePath);
       const fileDir = dirname(filePath);
       if (!existsSync(fileDir)) {
@@ -983,6 +1012,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const schemasDir2 = resolve(basePath2, tsConfig2.schemasDir ?? 'schemas');
       const enumDir2 = resolve(basePath2, tsConfig2.enumDir ?? 'enum');
 
+      // Plugin enums go to node_modules/.omnify/enum (hidden, auto-generated)
+      const pluginEnumDir2 = resolve(rootDir, 'node_modules/.omnify/enum');
+
       // Calculate enum import prefix (relative path from schemas to enum)
       const enumImportPrefix2 = relative(schemasDir2, enumDir2).replace(/\\/g, '/');
 
@@ -995,6 +1027,24 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         mkdirSync(enumDir2, { recursive: true });
         logger.debug(`Created directory: ${enumDir2}`);
       }
+      if (!existsSync(pluginEnumDir2)) {
+        mkdirSync(pluginEnumDir2, { recursive: true });
+        logger.debug(`Created directory: ${pluginEnumDir2}`);
+      }
+
+      // Create package.json for @omnify/generated alias
+      const omnifyPkgDir2 = resolve(rootDir, 'node_modules/.omnify');
+      const omnifyPkgJson2 = resolve(omnifyPkgDir2, 'package.json');
+      if (!existsSync(omnifyPkgJson2)) {
+        writeFileSync(omnifyPkgJson2, JSON.stringify({
+          name: '@omnify/generated',
+          version: '0.0.0',
+          private: true,
+          exports: {
+            './enum/*': './enum/*.js',
+          },
+        }, null, 2));
+      }
 
       // Enable multiLocale if locale config has multiple locales
       const isMultiLocale = config.locale && config.locale.locales && config.locale.locales.length > 1;
@@ -1006,11 +1056,19 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         generateRules: tsConfig2.generateRules ?? true,
         validationTemplates: tsConfig2.validationTemplates,
         enumImportPrefix: enumImportPrefix2,
+        pluginEnumImportPrefix: '@omnify/generated/enum',
       });
 
       for (const file of typeFiles) {
         // Determine output directory based on file category
-        const outputDir2 = file.category === 'enum' ? enumDir2 : schemasDir2;
+        let outputDir2: string;
+        if (file.category === 'plugin-enum') {
+          outputDir2 = pluginEnumDir2;
+        } else if (file.category === 'enum') {
+          outputDir2 = enumDir2;
+        } else {
+          outputDir2 = schemasDir2;
+        }
         const filePath = resolve(outputDir2, file.filePath);
         const fileDir = dirname(filePath);
         if (!existsSync(fileDir)) {

@@ -1,4 +1,4 @@
 
-> @famgia/omnify-cli@0.0.164 typecheck /Users/f.satoshi/Herd/omnify-ts/packages/cli
+> @famgia/omnify-cli@0.0.164 typecheck /Users/f.satoshi/Herd/omnify-ts/packages/omnify-core-cli
 > tsc --noEmit
 
