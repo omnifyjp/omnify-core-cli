@@ -1122,7 +1122,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       if (pluginEnumsMap.size > 0) {
         const pluginAliasResult = addPluginEnumAlias(rootDir);
         if (pluginAliasResult.updated) {
-          logger.success('Auto-configured .omnify-generated alias in vite.config');
+          logger.success('Auto-configured @omnify-client alias in vite.config');
         }
         const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
         if (pluginPathResult.updated) {

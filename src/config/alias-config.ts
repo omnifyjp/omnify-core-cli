@@ -337,7 +337,7 @@ export function addPluginEnumAlias(rootDir: string): { updated: boolean; error?:
         // Match pattern: '@omnify': ... ),  (handles single and multi-line definitions)
         const lines = content.split('\n');
         let insertIndex = -1;
-        
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             // Look for line containing @omnify alias
@@ -382,7 +382,7 @@ export function addPluginEnumTsconfigPath(rootDir: string): { updated: boolean; 
 
     try {
         const content = readFileSync(configPath, 'utf-8');
-        
+
         // Check if already has @omnify-client path
         if (content.includes('@omnify-client')) {
             return { updated: false };
