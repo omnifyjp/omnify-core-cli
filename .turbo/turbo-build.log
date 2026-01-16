@@ -1,5 +1,5 @@
 
-> @famgia/omnify-cli@0.0.164 build /Users/f.satoshi/Herd/omnify-ts/packages/omnify-core-cli
+> @famgia/omnify-cli@0.0.165 build /Users/f.satoshi/Herd/omnify-ts/packages/omnify-core-cli
 > tsup
 
 [34mCLI[39m Building entry: src/index.ts
@@ -11,21 +11,21 @@
 [34mCLI[39m tsup v8.5.1
 [34mCLI[39m Using tsup config: /Users/f.satoshi/Herd/omnify-ts/packages/omnify-core-cli/tsup.config.ts
 [34mCLI[39m Target: es2022
-[34mESM[39m Build start
 [34mCLI[39m Target: es2022
+[34mESM[39m Build start
 [34mCLI[39m Cleaning output folder
 [34mESM[39m Build start
 [34mCJS[39m Build start
-[32mCJS[39m [1mdist/index.cjs     [22m[32m80.44 KB[39m
-[32mCJS[39m [1mdist/index.cjs.map [22m[32m147.90 KB[39m
-[32mCJS[39m ⚡️ Build success in 37ms
-[32mESM[39m [1mdist/index.js     [22m[32m75.07 KB[39m
-[32mESM[39m [1mdist/index.js.map [22m[32m147.99 KB[39m
-[32mESM[39m ⚡️ Build success in 37ms
-[32mESM[39m [1mdist/cli.js     [22m[32m109.62 KB[39m
-[32mESM[39m [1mdist/cli.js.map [22m[32m213.88 KB[39m
-[32mESM[39m ⚡️ Build success in 45ms
+[32mCJS[39m [1mdist/index.cjs     [22m[32m81.68 KB[39m
+[32mCJS[39m [1mdist/index.cjs.map [22m[32m149.87 KB[39m
+[32mCJS[39m ⚡️ Build success in 27ms
+[32mESM[39m [1mdist/index.js     [22m[32m76.19 KB[39m
+[32mESM[39m [1mdist/index.js.map [22m[32m149.96 KB[39m
+[32mESM[39m ⚡️ Build success in 27ms
+[32mESM[39m [1mdist/cli.js     [22m[32m110.73 KB[39m
+[32mESM[39m [1mdist/cli.js.map [22m[32m215.85 KB[39m
+[32mESM[39m ⚡️ Build success in 32ms
 [34mDTS[39m Build start
-[32mDTS[39m ⚡️ Build success in 636ms
+[32mDTS[39m ⚡️ Build success in 514ms
 [32mDTS[39m [1mdist/index.d.ts  [22m[32m12.29 KB[39m
 [32mDTS[39m [1mdist/index.d.cts [22m[32m12.29 KB[39m

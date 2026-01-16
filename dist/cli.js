@@ -1632,7 +1632,9 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
     const basePath = resolve8(rootDir, tsConfig.path);
     const schemasDir = resolve8(basePath, tsConfig.schemasDir ?? "schemas");
     const enumDir = resolve8(basePath, tsConfig.enumDir ?? "enum");
-    const pluginEnumDir = resolve8(rootDir, "node_modules/@omnify-client/enum");
+    const omnifyClientDir = resolve8(rootDir, "node_modules/@omnify-client");
+    const pluginEnumDir = resolve8(omnifyClientDir, "enum");
+    const baseSchemasDir = resolve8(omnifyClientDir, "schemas");
     const enumImportPrefix = relative(schemasDir, enumDir).replace(/\\/g, "/");
     if (!existsSync8(schemasDir)) {
       mkdirSync3(schemasDir, { recursive: true });
@@ -1646,16 +1648,19 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
       mkdirSync3(pluginEnumDir, { recursive: true });
       logger.debug(`Created directory: ${pluginEnumDir}`);
     }
-    const omnifyPkgDir = resolve8(rootDir, "node_modules/@omnify-client");
-    const omnifyPkgJson = resolve8(omnifyPkgDir, "package.json");
+    if (!existsSync8(baseSchemasDir)) {
+      mkdirSync3(baseSchemasDir, { recursive: true });
+      logger.debug(`Created directory: ${baseSchemasDir}`);
+    }
+    const omnifyPkgJson = resolve8(omnifyClientDir, "package.json");
     if (!existsSync8(omnifyPkgJson)) {
       writeFileSync4(omnifyPkgJson, JSON.stringify({
         name: "@omnify-client",
         version: "0.0.0",
         private: true,
-        main: "./enum/index.js",
         exports: {
-          "./enum/*": "./enum/*.js"
+          "./enum/*": "./enum/*.js",
+          "./schemas/*": "./schemas/*.js"
         }
       }, null, 2));
     }
@@ -1668,18 +1673,25 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
       generateRules: tsConfig.generateRules ?? true,
       validationTemplates: tsConfig.validationTemplates,
       enumImportPrefix,
-      pluginEnumImportPrefix: "@omnify-client/enum"
+      pluginEnumImportPrefix: "@omnify-client/enum",
+      baseImportPrefix: "@omnify-client/schemas",
+      schemaEnumImportPrefix: "@omnify/enum"
+      // Absolute path for node_modules base files
     });
     for (const file of typeFiles) {
       let outputDir;
+      let outputFilePath = file.filePath;
       if (file.category === "plugin-enum") {
         outputDir = pluginEnumDir;
+      } else if (file.category === "base") {
+        outputDir = baseSchemasDir;
+        outputFilePath = file.filePath.replace(/^base\//, "");
       } else if (file.category === "enum") {
         outputDir = enumDir;
       } else {
         outputDir = schemasDir;
       }
-      const filePath = resolve8(outputDir, file.filePath);
+      const filePath = resolve8(outputDir, outputFilePath);
       const fileDir = dirname6(filePath);
       if (!existsSync8(fileDir)) {
         mkdirSync3(fileDir, { recursive: true });
@@ -1962,7 +1974,9 @@ async function runGenerate(options) {
       const basePath2 = resolve8(rootDir, tsConfig2.path);
       const schemasDir2 = resolve8(basePath2, tsConfig2.schemasDir ?? "schemas");
       const enumDir2 = resolve8(basePath2, tsConfig2.enumDir ?? "enum");
-      const pluginEnumDir2 = resolve8(rootDir, "node_modules/@omnify-client/enum");
+      const omnifyClientDir2 = resolve8(rootDir, "node_modules/@omnify-client");
+      const pluginEnumDir2 = resolve8(omnifyClientDir2, "enum");
+      const baseSchemasDir2 = resolve8(omnifyClientDir2, "schemas");
       const enumImportPrefix2 = relative(schemasDir2, enumDir2).replace(/\\/g, "/");
       if (!existsSync8(schemasDir2)) {
         mkdirSync3(schemasDir2, { recursive: true });
@@ -1976,16 +1990,19 @@ async function runGenerate(options) {
         mkdirSync3(pluginEnumDir2, { recursive: true });
         logger.debug(`Created directory: ${pluginEnumDir2}`);
       }
-      const omnifyPkgDir2 = resolve8(rootDir, "node_modules/@omnify-client");
-      const omnifyPkgJson2 = resolve8(omnifyPkgDir2, "package.json");
+      if (!existsSync8(baseSchemasDir2)) {
+        mkdirSync3(baseSchemasDir2, { recursive: true });
+        logger.debug(`Created directory: ${baseSchemasDir2}`);
+      }
+      const omnifyPkgJson2 = resolve8(omnifyClientDir2, "package.json");
       if (!existsSync8(omnifyPkgJson2)) {
         writeFileSync4(omnifyPkgJson2, JSON.stringify({
           name: "@omnify-client",
           version: "0.0.0",
           private: true,
-          main: "./enum/index.js",
           exports: {
-            "./enum/*": "./enum/*.js"
+            "./enum/*": "./enum/*.js",
+            "./schemas/*": "./schemas/*.js"
           }
         }, null, 2));
       }
@@ -1998,18 +2015,25 @@ async function runGenerate(options) {
         generateRules: tsConfig2.generateRules ?? true,
         validationTemplates: tsConfig2.validationTemplates,
         enumImportPrefix: enumImportPrefix2,
-        pluginEnumImportPrefix: "@omnify-client/enum"
+        pluginEnumImportPrefix: "@omnify-client/enum",
+        baseImportPrefix: "@omnify-client/schemas",
+        schemaEnumImportPrefix: "@omnify/enum"
+        // Absolute path for node_modules base files
       });
       for (const file of typeFiles) {
         let outputDir2;
+        let outputFilePath2 = file.filePath;
         if (file.category === "plugin-enum") {
           outputDir2 = pluginEnumDir2;
+        } else if (file.category === "base") {
+          outputDir2 = baseSchemasDir2;
+          outputFilePath2 = file.filePath.replace(/^base\//, "");
         } else if (file.category === "enum") {
           outputDir2 = enumDir2;
         } else {
           outputDir2 = schemasDir2;
         }
-        const filePath = resolve8(outputDir2, file.filePath);
+        const filePath = resolve8(outputDir2, outputFilePath2);
         const fileDir = dirname6(filePath);
         if (!existsSync8(fileDir)) {
           mkdirSync3(fileDir, { recursive: true });
@@ -2040,7 +2064,7 @@ async function runGenerate(options) {
       if (pluginEnumsMap.size > 0) {
         const pluginAliasResult = addPluginEnumAlias(rootDir);
         if (pluginAliasResult.updated) {
-          logger.success("Auto-configured .omnify-generated alias in vite.config");
+          logger.success("Auto-configured @omnify-client alias in vite.config");
         }
         const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
         if (pluginPathResult.updated) {

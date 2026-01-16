@@ -582,8 +582,10 @@ function runDirectGeneration(
     const schemasDir = resolve(basePath, tsConfig.schemasDir ?? 'schemas');
     const enumDir = resolve(basePath, tsConfig.enumDir ?? 'enum');
 
-    // Plugin enums go to node_modules/@omnify-client/enum (auto-generated)
-    const pluginEnumDir = resolve(rootDir, 'node_modules/@omnify-client/enum');
+    // Generated files go to node_modules/@omnify-client (auto-generated)
+    const omnifyClientDir = resolve(rootDir, 'node_modules/@omnify-client');
+    const pluginEnumDir = resolve(omnifyClientDir, 'enum');
+    const baseSchemasDir = resolve(omnifyClientDir, 'schemas');
 
     // Calculate enum import prefix (relative path from schemas to enum)
     const enumImportPrefix = relative(schemasDir, enumDir).replace(/\\/g, '/');
@@ -601,18 +603,21 @@ function runDirectGeneration(
       mkdirSync(pluginEnumDir, { recursive: true });
       logger.debug(`Created directory: ${pluginEnumDir}`);
     }
+    if (!existsSync(baseSchemasDir)) {
+      mkdirSync(baseSchemasDir, { recursive: true });
+      logger.debug(`Created directory: ${baseSchemasDir}`);
+    }
 
     // Create package.json for @omnify-client package
-    const omnifyPkgDir = resolve(rootDir, 'node_modules/@omnify-client');
-    const omnifyPkgJson = resolve(omnifyPkgDir, 'package.json');
+    const omnifyPkgJson = resolve(omnifyClientDir, 'package.json');
     if (!existsSync(omnifyPkgJson)) {
       writeFileSync(omnifyPkgJson, JSON.stringify({
         name: '@omnify-client',
         version: '0.0.0',
         private: true,
-        main: './enum/index.js',
         exports: {
           './enum/*': './enum/*.js',
+          './schemas/*': './schemas/*.js',
         },
       }, null, 2));
     }
@@ -628,19 +633,28 @@ function runDirectGeneration(
       validationTemplates: tsConfig.validationTemplates,
       enumImportPrefix,
       pluginEnumImportPrefix: '@omnify-client/enum',
+      baseImportPrefix: '@omnify-client/schemas',
+      schemaEnumImportPrefix: '@omnify/enum', // Absolute path for node_modules base files
     });
 
     for (const file of typeFiles) {
       // Determine output directory based on file category
       let outputDir: string;
+      let outputFilePath = file.filePath;
+
       if (file.category === 'plugin-enum') {
         outputDir = pluginEnumDir;
+      } else if (file.category === 'base') {
+        // Base files go to node_modules/@omnify-client/schemas/
+        outputDir = baseSchemasDir;
+        // Remove 'base/' prefix from filePath since we're already in schemas/
+        outputFilePath = file.filePath.replace(/^base\//, '');
       } else if (file.category === 'enum') {
         outputDir = enumDir;
       } else {
         outputDir = schemasDir;
       }
-      const filePath = resolve(outputDir, file.filePath);
+      const filePath = resolve(outputDir, outputFilePath);
       const fileDir = dirname(filePath);
       if (!existsSync(fileDir)) {
         mkdirSync(fileDir, { recursive: true });
@@ -1025,8 +1039,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const schemasDir2 = resolve(basePath2, tsConfig2.schemasDir ?? 'schemas');
       const enumDir2 = resolve(basePath2, tsConfig2.enumDir ?? 'enum');
 
-      // Plugin enums go to node_modules/@omnify-client/enum (auto-generated)
-      const pluginEnumDir2 = resolve(rootDir, 'node_modules/@omnify-client/enum');
+      // Generated files go to node_modules/@omnify-client (auto-generated)
+      const omnifyClientDir2 = resolve(rootDir, 'node_modules/@omnify-client');
+      const pluginEnumDir2 = resolve(omnifyClientDir2, 'enum');
+      const baseSchemasDir2 = resolve(omnifyClientDir2, 'schemas');
 
       // Calculate enum import prefix (relative path from schemas to enum)
       const enumImportPrefix2 = relative(schemasDir2, enumDir2).replace(/\\/g, '/');
@@ -1044,18 +1060,21 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         mkdirSync(pluginEnumDir2, { recursive: true });
         logger.debug(`Created directory: ${pluginEnumDir2}`);
       }
+      if (!existsSync(baseSchemasDir2)) {
+        mkdirSync(baseSchemasDir2, { recursive: true });
+        logger.debug(`Created directory: ${baseSchemasDir2}`);
+      }
 
       // Create package.json for @omnify-client package
-      const omnifyPkgDir2 = resolve(rootDir, 'node_modules/@omnify-client');
-      const omnifyPkgJson2 = resolve(omnifyPkgDir2, 'package.json');
+      const omnifyPkgJson2 = resolve(omnifyClientDir2, 'package.json');
       if (!existsSync(omnifyPkgJson2)) {
         writeFileSync(omnifyPkgJson2, JSON.stringify({
           name: '@omnify-client',
           version: '0.0.0',
           private: true,
-          main: './enum/index.js',
           exports: {
             './enum/*': './enum/*.js',
+            './schemas/*': './schemas/*.js',
           },
         }, null, 2));
       }
@@ -1071,19 +1090,28 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         validationTemplates: tsConfig2.validationTemplates,
         enumImportPrefix: enumImportPrefix2,
         pluginEnumImportPrefix: '@omnify-client/enum',
+        baseImportPrefix: '@omnify-client/schemas',
+        schemaEnumImportPrefix: '@omnify/enum', // Absolute path for node_modules base files
       });
 
       for (const file of typeFiles) {
         // Determine output directory based on file category
         let outputDir2: string;
+        let outputFilePath2 = file.filePath;
+
         if (file.category === 'plugin-enum') {
           outputDir2 = pluginEnumDir2;
+        } else if (file.category === 'base') {
+          // Base files go to node_modules/@omnify-client/schemas/
+          outputDir2 = baseSchemasDir2;
+          // Remove 'base/' prefix from filePath since we're already in schemas/
+          outputFilePath2 = file.filePath.replace(/^base\//, '');
         } else if (file.category === 'enum') {
           outputDir2 = enumDir2;
         } else {
           outputDir2 = schemasDir2;
         }
-        const filePath = resolve(outputDir2, file.filePath);
+        const filePath = resolve(outputDir2, outputFilePath2);
         const fileDir = dirname(filePath);
         if (!existsSync(fileDir)) {
           mkdirSync(fileDir, { recursive: true });
