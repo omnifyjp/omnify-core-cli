@@ -16,16 +16,16 @@ ESM Build start
 CLI Cleaning output folder
 ESM Build start
 CJS Build start
-CJS dist/index.cjs     81.68 KB
-CJS dist/index.cjs.map 149.87 KB
-CJS ⚡️ Build success in 38ms
-ESM dist/cli.js     110.73 KB
-ESM dist/cli.js.map 215.85 KB
-ESM ⚡️ Build success in 42ms
 ESM dist/index.js     76.19 KB
 ESM dist/index.js.map 149.96 KB
-ESM ⚡️ Build success in 38ms
+ESM ⚡️ Build success in 43ms
+CJS dist/index.cjs     81.68 KB
+CJS dist/index.cjs.map 149.87 KB
+CJS ⚡️ Build success in 45ms
+ESM dist/cli.js     110.73 KB
+ESM dist/cli.js.map 215.85 KB
+ESM ⚡️ Build success in 52ms
 DTS Build start
-DTS ⚡️ Build success in 535ms
+DTS ⚡️ Build success in 698ms
 DTS dist/index.d.ts  12.29 KB
 DTS dist/index.d.cts 12.29 KB
