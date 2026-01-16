@@ -441,6 +441,9 @@ var import_node_path3 = require("path");
 function hasViteOmnifyAlias(content) {
   return content.includes("'@omnify'") || content.includes('"@omnify"') || content.includes("@omnify:") || content.includes("'@omnify/");
 }
+function hasViteOmnifyGeneratedAlias(content) {
+  return content.includes("'.omnify-generated'") || content.includes('".omnify-generated"') || content.includes(".omnify-generated/");
+}
 function hasTsconfigOmnifyPath(content) {
   return content.includes('"@omnify/*"') || content.includes("'@omnify/*'") || content.includes('"@omnify/"');
 }
@@ -611,6 +614,73 @@ function configureOmnifyAlias(rootDir, omnifyPath = "omnify", silent = false) {
     }
   }
   return result;
+}
+function addPluginEnumAlias(rootDir) {
+  const configPaths = [
+    (0, import_node_path3.resolve)(rootDir, "vite.config.ts"),
+    (0, import_node_path3.resolve)(rootDir, "vite.config.js"),
+    (0, import_node_path3.resolve)(rootDir, "vite.config.mts"),
+    (0, import_node_path3.resolve)(rootDir, "vite.config.mjs")
+  ];
+  const configPath = configPaths.find((p) => (0, import_node_fs3.existsSync)(p));
+  if (!configPath) {
+    return { updated: false };
+  }
+  try {
+    let content = (0, import_node_fs3.readFileSync)(configPath, "utf-8");
+    if (hasViteOmnifyGeneratedAlias(content)) {
+      return { updated: false };
+    }
+    const omnifyAliasPatterns = [
+      /'@omnify'\s*:\s*[^,]+,/,
+      /"@omnify"\s*:\s*[^,]+,/
+    ];
+    for (const pattern of omnifyAliasPatterns) {
+      const match = content.match(pattern);
+      if (match) {
+        const insertPoint = match.index + match[0].length;
+        const aliasLine = `
+      '.omnify-generated': path.resolve(__dirname, 'node_modules/.omnify-generated'),`;
+        content = content.slice(0, insertPoint) + aliasLine + content.slice(insertPoint);
+        (0, import_node_fs3.writeFileSync)(configPath, content);
+        return { updated: true };
+      }
+    }
+    return { updated: false, error: "Could not find @omnify alias to add .omnify-generated after" };
+  } catch (error) {
+    return {
+      updated: false,
+      error: `Failed to add plugin enum alias: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+function addPluginEnumTsconfigPath(rootDir) {
+  const configPath = (0, import_node_path3.resolve)(rootDir, "tsconfig.json");
+  if (!(0, import_node_fs3.existsSync)(configPath)) {
+    return { updated: false };
+  }
+  try {
+    const content = (0, import_node_fs3.readFileSync)(configPath, "utf-8");
+    if (content.includes(".omnify-generated")) {
+      return { updated: false };
+    }
+    const jsonContent = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
+    const config = JSON.parse(jsonContent);
+    if (!config.compilerOptions) {
+      config.compilerOptions = {};
+    }
+    if (!config.compilerOptions.paths) {
+      config.compilerOptions.paths = {};
+    }
+    config.compilerOptions.paths[".omnify-generated/*"] = ["./node_modules/.omnify-generated/*"];
+    (0, import_node_fs3.writeFileSync)(configPath, JSON.stringify(config, null, 2));
+    return { updated: true };
+  } catch (error) {
+    return {
+      updated: false,
+      error: `Failed to add plugin enum tsconfig path: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
 }
 
 // src/commands/init.ts
@@ -1556,6 +1626,7 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
     const basePath = (0, import_node_path8.resolve)(rootDir, tsConfig.path);
     const schemasDir = (0, import_node_path8.resolve)(basePath, tsConfig.schemasDir ?? "schemas");
     const enumDir = (0, import_node_path8.resolve)(basePath, tsConfig.enumDir ?? "enum");
+    const pluginEnumDir = (0, import_node_path8.resolve)(rootDir, "node_modules/.omnify-generated/enum");
     const enumImportPrefix = (0, import_node_path8.relative)(schemasDir, enumDir).replace(/\\/g, "/");
     if (!(0, import_node_fs8.existsSync)(schemasDir)) {
       (0, import_node_fs8.mkdirSync)(schemasDir, { recursive: true });
@@ -1565,6 +1636,23 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
       (0, import_node_fs8.mkdirSync)(enumDir, { recursive: true });
       logger.debug(`Created directory: ${enumDir}`);
     }
+    if (!(0, import_node_fs8.existsSync)(pluginEnumDir)) {
+      (0, import_node_fs8.mkdirSync)(pluginEnumDir, { recursive: true });
+      logger.debug(`Created directory: ${pluginEnumDir}`);
+    }
+    const omnifyPkgDir = (0, import_node_path8.resolve)(rootDir, "node_modules/.omnify-generated");
+    const omnifyPkgJson = (0, import_node_path8.resolve)(omnifyPkgDir, "package.json");
+    if (!(0, import_node_fs8.existsSync)(omnifyPkgJson)) {
+      (0, import_node_fs8.writeFileSync)(omnifyPkgJson, JSON.stringify({
+        name: ".omnify-generated",
+        version: "0.0.0",
+        private: true,
+        main: "./enum/index.js",
+        exports: {
+          "./enum/*": "./enum/*.js"
+        }
+      }, null, 2));
+    }
     const isMultiLocale = config.locale && config.locale.locales && config.locale.locales.length > 1;
     const typeFiles = (0, import_omnify_typescript.generateTypeScript)(schemas, {
       customTypes: customTypesMap,
@@ -1573,10 +1661,18 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
       multiLocale: isMultiLocale,
       generateRules: tsConfig.generateRules ?? true,
       validationTemplates: tsConfig.validationTemplates,
-      enumImportPrefix
+      enumImportPrefix,
+      pluginEnumImportPrefix: ".omnify-generated/enum"
     });
     for (const file of typeFiles) {
-      const outputDir = file.category === "enum" ? enumDir : schemasDir;
+      let outputDir;
+      if (file.category === "plugin-enum") {
+        outputDir = pluginEnumDir;
+      } else if (file.category === "enum") {
+        outputDir = enumDir;
+      } else {
+        outputDir = schemasDir;
+      }
       const filePath = (0, import_node_path8.resolve)(outputDir, file.filePath);
       const fileDir = (0, import_node_path8.dirname)(filePath);
       if (!(0, import_node_fs8.existsSync)(fileDir)) {
@@ -1604,6 +1700,16 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
     }
     if (aliasResult.tsconfigUpdated) {
       logger.success("Auto-configured @omnify/* path in tsconfig.json");
+    }
+    if (pluginEnumsMap.size > 0) {
+      const pluginAliasResult = addPluginEnumAlias(rootDir);
+      if (pluginAliasResult.updated) {
+        logger.success("Auto-configured .omnify-generated alias in vite.config");
+      }
+      const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+      if (pluginPathResult.updated) {
+        logger.success("Auto-configured .omnify-generated/* path in tsconfig.json");
+      }
     }
   }
   return { migrations: migrationsGenerated, types: typesGenerated, models: modelsGenerated, factories: factoriesGenerated };
@@ -1850,6 +1956,7 @@ async function runGenerate(options) {
       const basePath2 = (0, import_node_path8.resolve)(rootDir, tsConfig2.path);
       const schemasDir2 = (0, import_node_path8.resolve)(basePath2, tsConfig2.schemasDir ?? "schemas");
       const enumDir2 = (0, import_node_path8.resolve)(basePath2, tsConfig2.enumDir ?? "enum");
+      const pluginEnumDir2 = (0, import_node_path8.resolve)(rootDir, "node_modules/.omnify-generated/enum");
       const enumImportPrefix2 = (0, import_node_path8.relative)(schemasDir2, enumDir2).replace(/\\/g, "/");
       if (!(0, import_node_fs8.existsSync)(schemasDir2)) {
         (0, import_node_fs8.mkdirSync)(schemasDir2, { recursive: true });
@@ -1859,6 +1966,23 @@ async function runGenerate(options) {
         (0, import_node_fs8.mkdirSync)(enumDir2, { recursive: true });
         logger.debug(`Created directory: ${enumDir2}`);
       }
+      if (!(0, import_node_fs8.existsSync)(pluginEnumDir2)) {
+        (0, import_node_fs8.mkdirSync)(pluginEnumDir2, { recursive: true });
+        logger.debug(`Created directory: ${pluginEnumDir2}`);
+      }
+      const omnifyPkgDir2 = (0, import_node_path8.resolve)(rootDir, "node_modules/.omnify-generated");
+      const omnifyPkgJson2 = (0, import_node_path8.resolve)(omnifyPkgDir2, "package.json");
+      if (!(0, import_node_fs8.existsSync)(omnifyPkgJson2)) {
+        (0, import_node_fs8.writeFileSync)(omnifyPkgJson2, JSON.stringify({
+          name: ".omnify-generated",
+          version: "0.0.0",
+          private: true,
+          main: "./enum/index.js",
+          exports: {
+            "./enum/*": "./enum/*.js"
+          }
+        }, null, 2));
+      }
       const isMultiLocale = config.locale && config.locale.locales && config.locale.locales.length > 1;
       const typeFiles = (0, import_omnify_typescript.generateTypeScript)(schemas, {
         customTypes: customTypesMap,
@@ -1867,10 +1991,18 @@ async function runGenerate(options) {
         multiLocale: isMultiLocale,
         generateRules: tsConfig2.generateRules ?? true,
         validationTemplates: tsConfig2.validationTemplates,
-        enumImportPrefix: enumImportPrefix2
+        enumImportPrefix: enumImportPrefix2,
+        pluginEnumImportPrefix: ".omnify-generated/enum"
       });
       for (const file of typeFiles) {
-        const outputDir2 = file.category === "enum" ? enumDir2 : schemasDir2;
+        let outputDir2;
+        if (file.category === "plugin-enum") {
+          outputDir2 = pluginEnumDir2;
+        } else if (file.category === "enum") {
+          outputDir2 = enumDir2;
+        } else {
+          outputDir2 = schemasDir2;
+        }
         const filePath = (0, import_node_path8.resolve)(outputDir2, file.filePath);
         const fileDir = (0, import_node_path8.dirname)(filePath);
         if (!(0, import_node_fs8.existsSync)(fileDir)) {
@@ -1898,6 +2030,16 @@ async function runGenerate(options) {
       }
       if (aliasResult.tsconfigUpdated) {
         logger.success("Auto-configured @omnify/* path in tsconfig.json");
+      }
+      if (pluginEnumsMap.size > 0) {
+        const pluginAliasResult = addPluginEnumAlias(rootDir);
+        if (pluginAliasResult.updated) {
+          logger.success("Auto-configured .omnify-generated alias in vite.config");
+        }
+        const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+        if (pluginPathResult.updated) {
+          logger.success("Auto-configured .omnify-generated/* path in tsconfig.json");
+        }
       }
       if ((0, import_omnify_typescript.shouldGenerateAIGuides)(rootDir)) {
         const tsAIResult = (0, import_omnify_typescript.generateAIGuides)(rootDir, {

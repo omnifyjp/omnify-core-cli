@@ -51,7 +51,7 @@ import type {
 } from '@famgia/omnify-types';
 import type { ResolvedOmnifyConfig } from '../config/types.js';
 import { loadConfig, validateConfig } from '../config/loader.js';
-import { configureOmnifyAlias } from '../config/alias-config.js';
+import { configureOmnifyAlias, addPluginEnumAlias, addPluginEnumTsconfigPath } from '../config/alias-config.js';
 import { logger } from '../output/logger.js';
 import { generateAIGuides } from '../guides/index.js';
 
@@ -582,8 +582,8 @@ function runDirectGeneration(
     const schemasDir = resolve(basePath, tsConfig.schemasDir ?? 'schemas');
     const enumDir = resolve(basePath, tsConfig.enumDir ?? 'enum');
 
-    // Plugin enums go to node_modules/.omnify/enum (hidden, auto-generated)
-    const pluginEnumDir = resolve(rootDir, 'node_modules/.omnify/enum');
+    // Plugin enums go to node_modules/.omnify-generated/enum (auto-generated)
+    const pluginEnumDir = resolve(rootDir, 'node_modules/.omnify-generated/enum');
 
     // Calculate enum import prefix (relative path from schemas to enum)
     const enumImportPrefix = relative(schemasDir, enumDir).replace(/\\/g, '/');
@@ -602,14 +602,15 @@ function runDirectGeneration(
       logger.debug(`Created directory: ${pluginEnumDir}`);
     }
 
-    // Create package.json for @omnify/enum alias
-    const omnifyPkgDir = resolve(rootDir, 'node_modules/.omnify');
+    // Create package.json for .omnify-generated package
+    const omnifyPkgDir = resolve(rootDir, 'node_modules/.omnify-generated');
     const omnifyPkgJson = resolve(omnifyPkgDir, 'package.json');
     if (!existsSync(omnifyPkgJson)) {
       writeFileSync(omnifyPkgJson, JSON.stringify({
-        name: '@omnify/generated',
+        name: '.omnify-generated',
         version: '0.0.0',
         private: true,
+        main: './enum/index.js',
         exports: {
           './enum/*': './enum/*.js',
         },
@@ -626,7 +627,7 @@ function runDirectGeneration(
       generateRules: tsConfig.generateRules ?? true,
       validationTemplates: tsConfig.validationTemplates,
       enumImportPrefix,
-      pluginEnumImportPrefix: '@omnify/generated/enum',
+      pluginEnumImportPrefix: '.omnify-generated/enum',
     });
 
     for (const file of typeFiles) {
@@ -672,6 +673,18 @@ function runDirectGeneration(
     }
     if (aliasResult.tsconfigUpdated) {
       logger.success('Auto-configured @omnify/* path in tsconfig.json');
+    }
+    
+    // Configure .omnify-generated alias for plugin enums (if there are plugin enums)
+    if (pluginEnumsMap.size > 0) {
+      const pluginAliasResult = addPluginEnumAlias(rootDir);
+      if (pluginAliasResult.updated) {
+        logger.success('Auto-configured .omnify-generated alias in vite.config');
+      }
+      const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+      if (pluginPathResult.updated) {
+        logger.success('Auto-configured .omnify-generated/* path in tsconfig.json');
+      }
     }
   }
 
@@ -1012,8 +1025,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const schemasDir2 = resolve(basePath2, tsConfig2.schemasDir ?? 'schemas');
       const enumDir2 = resolve(basePath2, tsConfig2.enumDir ?? 'enum');
 
-      // Plugin enums go to node_modules/.omnify/enum (hidden, auto-generated)
-      const pluginEnumDir2 = resolve(rootDir, 'node_modules/.omnify/enum');
+      // Plugin enums go to node_modules/.omnify-generated/enum (auto-generated)
+      const pluginEnumDir2 = resolve(rootDir, 'node_modules/.omnify-generated/enum');
 
       // Calculate enum import prefix (relative path from schemas to enum)
       const enumImportPrefix2 = relative(schemasDir2, enumDir2).replace(/\\/g, '/');
@@ -1032,14 +1045,15 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         logger.debug(`Created directory: ${pluginEnumDir2}`);
       }
 
-      // Create package.json for @omnify/generated alias
-      const omnifyPkgDir2 = resolve(rootDir, 'node_modules/.omnify');
+      // Create package.json for .omnify-generated package
+      const omnifyPkgDir2 = resolve(rootDir, 'node_modules/.omnify-generated');
       const omnifyPkgJson2 = resolve(omnifyPkgDir2, 'package.json');
       if (!existsSync(omnifyPkgJson2)) {
         writeFileSync(omnifyPkgJson2, JSON.stringify({
-          name: '@omnify/generated',
+          name: '.omnify-generated',
           version: '0.0.0',
           private: true,
+          main: './enum/index.js',
           exports: {
             './enum/*': './enum/*.js',
           },
@@ -1056,7 +1070,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         generateRules: tsConfig2.generateRules ?? true,
         validationTemplates: tsConfig2.validationTemplates,
         enumImportPrefix: enumImportPrefix2,
-        pluginEnumImportPrefix: '@omnify/generated/enum',
+        pluginEnumImportPrefix: '.omnify-generated/enum',
       });
 
       for (const file of typeFiles) {
@@ -1102,6 +1116,18 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       }
       if (aliasResult.tsconfigUpdated) {
         logger.success('Auto-configured @omnify/* path in tsconfig.json');
+      }
+      
+      // Configure .omnify-generated alias for plugin enums (if there are plugin enums)
+      if (pluginEnumsMap.size > 0) {
+        const pluginAliasResult = addPluginEnumAlias(rootDir);
+        if (pluginAliasResult.updated) {
+          logger.success('Auto-configured .omnify-generated alias in vite.config');
+        }
+        const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+        if (pluginPathResult.updated) {
+          logger.success('Auto-configured .omnify-generated/* path in tsconfig.json');
+        }
       }
 
       // Generate TypeScript AI guides if needed

@@ -33,6 +33,17 @@ function hasViteOmnifyAlias(content: string): boolean {
 }
 
 /**
+ * Check if vite.config.ts already has .omnify-generated alias configured
+ */
+function hasViteOmnifyGeneratedAlias(content: string): boolean {
+    return (
+        content.includes("'.omnify-generated'") ||
+        content.includes('".omnify-generated"') ||
+        content.includes('.omnify-generated/')
+    );
+}
+
+/**
  * Check if tsconfig.json already has @omnify path configured
  */
 function hasTsconfigOmnifyPath(content: string): boolean {
@@ -295,4 +306,107 @@ export function configureOmnifyAlias(
     }
 
     return result;
+}
+
+/**
+ * Add .omnify-generated alias to vite.config for plugin enum imports.
+ * This is needed because plugin enums are stored in node_modules/.omnify-generated
+ */
+export function addPluginEnumAlias(rootDir: string): { updated: boolean; error?: string } {
+    const configPaths = [
+        resolve(rootDir, 'vite.config.ts'),
+        resolve(rootDir, 'vite.config.js'),
+        resolve(rootDir, 'vite.config.mts'),
+        resolve(rootDir, 'vite.config.mjs'),
+    ];
+
+    const configPath = configPaths.find((p) => existsSync(p));
+    if (!configPath) {
+        return { updated: false };
+    }
+
+    try {
+        let content = readFileSync(configPath, 'utf-8');
+
+        // Check if already configured
+        if (hasViteOmnifyGeneratedAlias(content)) {
+            return { updated: false };
+        }
+
+        // Find the line with @omnify alias that ends with ), and add new alias after it
+        // Match pattern: '@omnify': ... ),  (handles single and multi-line definitions)
+        const lines = content.split('\n');
+        let insertIndex = -1;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Look for line containing @omnify alias
+            if ((line.includes("'@omnify'") || line.includes('"@omnify"')) && line.includes(':')) {
+                // Find the line where this alias definition ends (with ),)
+                for (let j = i; j < lines.length; j++) {
+                    if (lines[j].includes('),') || (lines[j].trim().endsWith(',') && lines[j].includes(')'))) {
+                        insertIndex = j + 1;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (insertIndex > 0) {
+            const indent = '      '; // Match typical Vite config indentation
+            const aliasLine = `${indent}'.omnify-generated': path.resolve(__dirname, 'node_modules/.omnify-generated'),`;
+            lines.splice(insertIndex, 0, aliasLine);
+            content = lines.join('\n');
+            writeFileSync(configPath, content);
+            return { updated: true };
+        }
+
+        return { updated: false, error: 'Could not find @omnify alias to add .omnify-generated after' };
+    } catch (error) {
+        return {
+            updated: false,
+            error: `Failed to add plugin enum alias: ${error instanceof Error ? error.message : String(error)}`,
+        };
+    }
+}
+
+/**
+ * Add .omnify-generated path to tsconfig.json for plugin enum imports.
+ */
+export function addPluginEnumTsconfigPath(rootDir: string): { updated: boolean; error?: string } {
+    const configPath = resolve(rootDir, 'tsconfig.json');
+    if (!existsSync(configPath)) {
+        return { updated: false };
+    }
+
+    try {
+        const content = readFileSync(configPath, 'utf-8');
+        
+        // Check if already has .omnify-generated path
+        if (content.includes('.omnify-generated')) {
+            return { updated: false };
+        }
+
+        // Parse JSON with comments
+        const jsonContent = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+        const config = JSON.parse(jsonContent);
+
+        if (!config.compilerOptions) {
+            config.compilerOptions = {};
+        }
+        if (!config.compilerOptions.paths) {
+            config.compilerOptions.paths = {};
+        }
+
+        config.compilerOptions.paths['.omnify-generated/*'] = ['./node_modules/.omnify-generated/*'];
+
+        writeFileSync(configPath, JSON.stringify(config, null, 2));
+        return { updated: true };
+    } catch (error) {
+        return {
+            updated: false,
+            error: `Failed to add plugin enum tsconfig path: ${error instanceof Error ? error.message : String(error)}`,
+        };
+    }
 }
