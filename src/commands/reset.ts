@@ -212,8 +212,8 @@ export async function runReset(options: ResetOptions): Promise<void> {
           paths.push({ name: `${pkgName} Legacy Generated`, path: pkgGenerated, type: 'dir' });
         }
 
-        // Package migrations
-        const pkgMigrations = join(pkgBase, pkgOutput.migrationsPath ?? 'database/migrations');
+        // Package migrations - IMPORTANT: Only delete omnify subdirectory, never the entire migrations folder!
+        const pkgMigrations = join(pkgBase, pkgOutput.migrationsPath ?? 'database/migrations/omnify');
         if (existsSync(pkgMigrations) && !paths.some(p => p.path === pkgMigrations)) {
           paths.push({
             name: `${pkgName} migrations`,

@@ -2308,7 +2308,7 @@ async function runReset(options) {
         if (existsSync9(pkgGenerated) && !paths.some((p) => p.path === pkgGenerated)) {
           paths.push({ name: `${pkgName} Legacy Generated`, path: pkgGenerated, type: "dir" });
         }
-        const pkgMigrations = join2(pkgBase, pkgOutput.migrationsPath ?? "database/migrations");
+        const pkgMigrations = join2(pkgBase, pkgOutput.migrationsPath ?? "database/migrations/omnify");
         if (existsSync9(pkgMigrations) && !paths.some((p) => p.path === pkgMigrations)) {
           paths.push({
             name: `${pkgName} migrations`,
