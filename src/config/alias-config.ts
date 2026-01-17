@@ -33,13 +33,13 @@ function hasViteOmnifyAlias(content: string): boolean {
 }
 
 /**
- * Check if vite.config.ts already has @omnify-client alias configured
+ * Check if vite.config.ts already has @omnify-base alias configured
  */
-function hasViteOmnifyClientAlias(content: string): boolean {
+function hasViteOmnifyBaseAlias(content: string): boolean {
     return (
-        content.includes("'@omnify-client'") ||
-        content.includes('"@omnify-client"') ||
-        content.includes('@omnify-client/')
+        content.includes("'@omnify-base'") ||
+        content.includes('"@omnify-base"') ||
+        content.includes('@omnify-base/')
     );
 }
 
@@ -309,8 +309,8 @@ export function configureOmnifyAlias(
 }
 
 /**
- * Add @omnify-client alias to vite.config for plugin enum imports.
- * This is needed because plugin enums are stored in node_modules/@omnify-client
+ * Add @omnify-base alias to vite.config for plugin enum imports.
+ * This is needed because plugin enums are stored in node_modules/@omnify-base
  */
 export function addPluginEnumAlias(rootDir: string): { updated: boolean; error?: string } {
     const configPaths = [
@@ -329,7 +329,7 @@ export function addPluginEnumAlias(rootDir: string): { updated: boolean; error?:
         let content = readFileSync(configPath, 'utf-8');
 
         // Check if already configured
-        if (hasViteOmnifyClientAlias(content)) {
+        if (hasViteOmnifyBaseAlias(content)) {
             return { updated: false };
         }
 
@@ -355,14 +355,14 @@ export function addPluginEnumAlias(rootDir: string): { updated: boolean; error?:
 
         if (insertIndex > 0) {
             const indent = '      '; // Match typical Vite config indentation
-            const aliasLine = `${indent}'@omnify-client': path.resolve(__dirname, 'node_modules/@omnify-client'),`;
+            const aliasLine = `${indent}'@omnify-base': path.resolve(__dirname, 'node_modules/@omnify-base'),`;
             lines.splice(insertIndex, 0, aliasLine);
             content = lines.join('\n');
             writeFileSync(configPath, content);
             return { updated: true };
         }
 
-        return { updated: false, error: 'Could not find @omnify alias to add @omnify-client after' };
+        return { updated: false, error: 'Could not find @omnify alias to add @omnify-base after' };
     } catch (error) {
         return {
             updated: false,
@@ -372,7 +372,7 @@ export function addPluginEnumAlias(rootDir: string): { updated: boolean; error?:
 }
 
 /**
- * Add @omnify-client path to tsconfig.json for plugin enum imports.
+ * Add @omnify-base path to tsconfig.json for plugin enum imports.
  */
 export function addPluginEnumTsconfigPath(rootDir: string): { updated: boolean; error?: string } {
     const configPath = resolve(rootDir, 'tsconfig.json');
@@ -383,8 +383,8 @@ export function addPluginEnumTsconfigPath(rootDir: string): { updated: boolean; 
     try {
         const content = readFileSync(configPath, 'utf-8');
 
-        // Check if already has @omnify-client path
-        if (content.includes('@omnify-client')) {
+        // Check if already has @omnify-base path
+        if (content.includes('@omnify-base')) {
             return { updated: false };
         }
 
@@ -399,7 +399,7 @@ export function addPluginEnumTsconfigPath(rootDir: string): { updated: boolean; 
             config.compilerOptions.paths = {};
         }
 
-        config.compilerOptions.paths['@omnify-client/*'] = ['./node_modules/@omnify-client/*'];
+        config.compilerOptions.paths['@omnify-base/*'] = ['./node_modules/@omnify-base/*'];
 
         writeFileSync(configPath, JSON.stringify(config, null, 2));
         return { updated: true };

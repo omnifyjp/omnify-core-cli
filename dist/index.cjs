@@ -441,8 +441,8 @@ var import_node_path3 = require("path");
 function hasViteOmnifyAlias(content) {
   return content.includes("'@omnify'") || content.includes('"@omnify"') || content.includes("@omnify:") || content.includes("'@omnify/");
 }
-function hasViteOmnifyClientAlias(content) {
-  return content.includes("'@omnify-client'") || content.includes('"@omnify-client"') || content.includes("@omnify-client/");
+function hasViteOmnifyBaseAlias(content) {
+  return content.includes("'@omnify-base'") || content.includes('"@omnify-base"') || content.includes("@omnify-base/");
 }
 function hasTsconfigOmnifyPath(content) {
   return content.includes('"@omnify/*"') || content.includes("'@omnify/*'") || content.includes('"@omnify/"');
@@ -628,7 +628,7 @@ function addPluginEnumAlias(rootDir) {
   }
   try {
     let content = (0, import_node_fs3.readFileSync)(configPath, "utf-8");
-    if (hasViteOmnifyClientAlias(content)) {
+    if (hasViteOmnifyBaseAlias(content)) {
       return { updated: false };
     }
     const lines = content.split("\n");
@@ -647,13 +647,13 @@ function addPluginEnumAlias(rootDir) {
     }
     if (insertIndex > 0) {
       const indent = "      ";
-      const aliasLine = `${indent}'@omnify-client': path.resolve(__dirname, 'node_modules/@omnify-client'),`;
+      const aliasLine = `${indent}'@omnify-base': path.resolve(__dirname, 'node_modules/@omnify-base'),`;
       lines.splice(insertIndex, 0, aliasLine);
       content = lines.join("\n");
       (0, import_node_fs3.writeFileSync)(configPath, content);
       return { updated: true };
     }
-    return { updated: false, error: "Could not find @omnify alias to add @omnify-client after" };
+    return { updated: false, error: "Could not find @omnify alias to add @omnify-base after" };
   } catch (error) {
     return {
       updated: false,
@@ -668,7 +668,7 @@ function addPluginEnumTsconfigPath(rootDir) {
   }
   try {
     const content = (0, import_node_fs3.readFileSync)(configPath, "utf-8");
-    if (content.includes("@omnify-client")) {
+    if (content.includes("@omnify-base")) {
       return { updated: false };
     }
     const jsonContent = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "");
@@ -679,7 +679,7 @@ function addPluginEnumTsconfigPath(rootDir) {
     if (!config.compilerOptions.paths) {
       config.compilerOptions.paths = {};
     }
-    config.compilerOptions.paths["@omnify-client/*"] = ["./node_modules/@omnify-client/*"];
+    config.compilerOptions.paths["@omnify-base/*"] = ["./node_modules/@omnify-base/*"];
     (0, import_node_fs3.writeFileSync)(configPath, JSON.stringify(config, null, 2));
     return { updated: true };
   } catch (error) {
@@ -1253,10 +1253,8 @@ function copyOmnifyGuides(rootDir) {
 function generateAIGuides(rootDir, _plugins) {
   let filesWritten = 0;
   const claudeMdPath = (0, import_node_path7.resolve)(rootDir, "CLAUDE.md");
-  if (!(0, import_node_fs7.existsSync)(claudeMdPath)) {
-    (0, import_node_fs7.writeFileSync)(claudeMdPath, CLAUDE_MD);
-    filesWritten++;
-  }
+  (0, import_node_fs7.writeFileSync)(claudeMdPath, CLAUDE_MD);
+  filesWritten++;
   filesWritten += copyOmnifyGuides(rootDir);
   return filesWritten;
 }
@@ -1633,9 +1631,9 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
     const basePath = (0, import_node_path8.resolve)(rootDir, tsConfig.path);
     const schemasDir = (0, import_node_path8.resolve)(basePath, tsConfig.schemasDir ?? "schemas");
     const enumDir = (0, import_node_path8.resolve)(basePath, tsConfig.enumDir ?? "enum");
-    const omnifyClientDir = (0, import_node_path8.resolve)(rootDir, "node_modules/@omnify-client");
-    const pluginEnumDir = (0, import_node_path8.resolve)(omnifyClientDir, "enum");
-    const baseSchemasDir = (0, import_node_path8.resolve)(omnifyClientDir, "schemas");
+    const omnifyBaseDir = (0, import_node_path8.resolve)(rootDir, "node_modules/@omnify-base");
+    const pluginEnumDir = (0, import_node_path8.resolve)(omnifyBaseDir, "enum");
+    const baseSchemasDir = (0, import_node_path8.resolve)(omnifyBaseDir, "schemas");
     const enumImportPrefix = (0, import_node_path8.relative)(schemasDir, enumDir).replace(/\\/g, "/");
     if (!(0, import_node_fs8.existsSync)(schemasDir)) {
       (0, import_node_fs8.mkdirSync)(schemasDir, { recursive: true });
@@ -1653,10 +1651,10 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
       (0, import_node_fs8.mkdirSync)(baseSchemasDir, { recursive: true });
       logger.debug(`Created directory: ${baseSchemasDir}`);
     }
-    const omnifyPkgJson = (0, import_node_path8.resolve)(omnifyClientDir, "package.json");
+    const omnifyPkgJson = (0, import_node_path8.resolve)(omnifyBaseDir, "package.json");
     if (!(0, import_node_fs8.existsSync)(omnifyPkgJson)) {
       (0, import_node_fs8.writeFileSync)(omnifyPkgJson, JSON.stringify({
-        name: "@omnify-client",
+        name: "@omnify-base",
         version: "0.0.0",
         private: true,
         exports: {
@@ -1674,8 +1672,8 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
       generateRules: tsConfig.generateRules ?? true,
       validationTemplates: tsConfig.validationTemplates,
       enumImportPrefix,
-      pluginEnumImportPrefix: "@omnify-client/enum",
-      baseImportPrefix: "@omnify-client/schemas",
+      pluginEnumImportPrefix: "@omnify-base/enum",
+      baseImportPrefix: "@omnify-base/schemas",
       schemaEnumImportPrefix: "@omnify/enum"
       // Absolute path for node_modules base files
     });
@@ -1706,13 +1704,6 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
       typesGenerated++;
     }
     logger.success(`Generated ${typesGenerated} TypeScript file(s)`);
-    const stubsResult = (0, import_omnify_typescript.copyStubs)({
-      targetDir: basePath,
-      skipIfExists: true
-    });
-    if (stubsResult.copied.length > 0) {
-      logger.success(`Generated ${stubsResult.copied.length} React stub(s)`);
-    }
     const aliasResult = configureOmnifyAlias(rootDir, tsConfig.path, true);
     if (aliasResult.viteUpdated) {
       logger.success("Auto-configured @omnify alias in vite.config");
@@ -1720,15 +1711,13 @@ function runDirectGeneration(schemas, config, rootDir, options, changes) {
     if (aliasResult.tsconfigUpdated) {
       logger.success("Auto-configured @omnify/* path in tsconfig.json");
     }
-    if (pluginEnumsMap.size > 0) {
-      const pluginAliasResult = addPluginEnumAlias(rootDir);
-      if (pluginAliasResult.updated) {
-        logger.success("Auto-configured @omnify-client alias in vite.config");
-      }
-      const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
-      if (pluginPathResult.updated) {
-        logger.success("Auto-configured @omnify-client/* path in tsconfig.json");
-      }
+    const pluginAliasResult = addPluginEnumAlias(rootDir);
+    if (pluginAliasResult.updated) {
+      logger.success("Auto-configured @omnify-base alias in vite.config");
+    }
+    const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+    if (pluginPathResult.updated) {
+      logger.success("Auto-configured @omnify-base/* path in tsconfig.json");
     }
   }
   return { migrations: migrationsGenerated, types: typesGenerated, models: modelsGenerated, factories: factoriesGenerated };
@@ -1901,11 +1890,48 @@ async function runGenerate(options) {
         return;
       }
     }
-    if (migrationValidation.missingFiles.length > 0) {
+    if (migrationValidation.missingFiles.length > 0 && config.output.laravel) {
       const toRegenerate = (0, import_omnify_atlas2.getMigrationsToRegenerate)(existingLock, migrationValidation.missingFiles);
       if (toRegenerate.length > 0) {
-        logger.info(`Will regenerate ${toRegenerate.length} missing migration(s) with original timestamps.`);
-        logger.warn("Auto-regeneration not yet implemented. Please restore from git or reset migrations.");
+        const createMigrations = toRegenerate.filter((m) => m.type === "create");
+        const alterMigrations = toRegenerate.filter((m) => m.type === "alter" || m.type === "drop");
+        if (createMigrations.length > 0) {
+          logger.info(`Regenerating ${createMigrations.length} missing CREATE migration(s) with original timestamps...`);
+          const migrationsDir2 = (0, import_node_path8.resolve)(rootDir, config.output.laravel.migrationsPath);
+          const customTypesMap2 = /* @__PURE__ */ new Map();
+          for (const plugin of config.plugins) {
+            if (plugin.types) {
+              for (const [typeName, typeDef] of Object.entries(plugin.types)) {
+                customTypesMap2.set(typeName, typeDef);
+              }
+            }
+          }
+          for (const migData of createMigrations) {
+            const migrationSchemas = Object.fromEntries(
+              Object.entries(schemas).filter(([name]) => migData.schemas.includes(name))
+            );
+            if (Object.keys(migrationSchemas).length === 0) {
+              logger.warn(`  Cannot regenerate ${migData.fileName}: schema not found`);
+              continue;
+            }
+            const regenerated = (0, import_omnify_laravel.generateMigrations)(migrationSchemas, {
+              timestamp: migData.timestamp,
+              customTypes: customTypesMap2
+            });
+            for (const mig of regenerated) {
+              const filePath = (0, import_node_path8.resolve)(migrationsDir2, migData.fileName);
+              (0, import_node_fs8.writeFileSync)(filePath, mig.content);
+              logger.success(`  Regenerated: ${migData.fileName}`);
+            }
+          }
+        }
+        if (alterMigrations.length > 0) {
+          logger.warn(`Cannot regenerate ${alterMigrations.length} ALTER/DROP migration(s) - original change data not available.`);
+          logger.warn("  Please restore these files from git or reset migrations with: npx omnify reset");
+          for (const m of alterMigrations) {
+            logger.warn(`    - ${m.fileName}`);
+          }
+        }
       }
     }
   }
@@ -1975,9 +2001,9 @@ async function runGenerate(options) {
       const basePath2 = (0, import_node_path8.resolve)(rootDir, tsConfig2.path);
       const schemasDir2 = (0, import_node_path8.resolve)(basePath2, tsConfig2.schemasDir ?? "schemas");
       const enumDir2 = (0, import_node_path8.resolve)(basePath2, tsConfig2.enumDir ?? "enum");
-      const omnifyClientDir2 = (0, import_node_path8.resolve)(rootDir, "node_modules/@omnify-client");
-      const pluginEnumDir2 = (0, import_node_path8.resolve)(omnifyClientDir2, "enum");
-      const baseSchemasDir2 = (0, import_node_path8.resolve)(omnifyClientDir2, "schemas");
+      const omnifyBaseDir2 = (0, import_node_path8.resolve)(rootDir, "node_modules/@omnify-base");
+      const pluginEnumDir2 = (0, import_node_path8.resolve)(omnifyBaseDir2, "enum");
+      const baseSchemasDir2 = (0, import_node_path8.resolve)(omnifyBaseDir2, "schemas");
       const enumImportPrefix2 = (0, import_node_path8.relative)(schemasDir2, enumDir2).replace(/\\/g, "/");
       if (!(0, import_node_fs8.existsSync)(schemasDir2)) {
         (0, import_node_fs8.mkdirSync)(schemasDir2, { recursive: true });
@@ -1995,10 +2021,10 @@ async function runGenerate(options) {
         (0, import_node_fs8.mkdirSync)(baseSchemasDir2, { recursive: true });
         logger.debug(`Created directory: ${baseSchemasDir2}`);
       }
-      const omnifyPkgJson2 = (0, import_node_path8.resolve)(omnifyClientDir2, "package.json");
+      const omnifyPkgJson2 = (0, import_node_path8.resolve)(omnifyBaseDir2, "package.json");
       if (!(0, import_node_fs8.existsSync)(omnifyPkgJson2)) {
         (0, import_node_fs8.writeFileSync)(omnifyPkgJson2, JSON.stringify({
-          name: "@omnify-client",
+          name: "@omnify-base",
           version: "0.0.0",
           private: true,
           exports: {
@@ -2016,8 +2042,8 @@ async function runGenerate(options) {
         generateRules: tsConfig2.generateRules ?? true,
         validationTemplates: tsConfig2.validationTemplates,
         enumImportPrefix: enumImportPrefix2,
-        pluginEnumImportPrefix: "@omnify-client/enum",
-        baseImportPrefix: "@omnify-client/schemas",
+        pluginEnumImportPrefix: "@omnify-base/enum",
+        baseImportPrefix: "@omnify-base/schemas",
         schemaEnumImportPrefix: "@omnify/enum"
         // Absolute path for node_modules base files
       });
@@ -2048,13 +2074,6 @@ async function runGenerate(options) {
         typesGenerated++;
       }
       logger.success(`Generated ${typesGenerated} TypeScript file(s)`);
-      const stubsResult2 = (0, import_omnify_typescript.copyStubs)({
-        targetDir: basePath2,
-        skipIfExists: true
-      });
-      if (stubsResult2.copied.length > 0) {
-        logger.success(`Generated ${stubsResult2.copied.length} React stub(s)`);
-      }
       const aliasResult = configureOmnifyAlias(rootDir, tsConfig2.path, true);
       if (aliasResult.viteUpdated) {
         logger.success("Auto-configured @omnify alias in vite.config");
@@ -2062,15 +2081,13 @@ async function runGenerate(options) {
       if (aliasResult.tsconfigUpdated) {
         logger.success("Auto-configured @omnify/* path in tsconfig.json");
       }
-      if (pluginEnumsMap.size > 0) {
-        const pluginAliasResult = addPluginEnumAlias(rootDir);
-        if (pluginAliasResult.updated) {
-          logger.success("Auto-configured @omnify-client alias in vite.config");
-        }
-        const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
-        if (pluginPathResult.updated) {
-          logger.success("Auto-configured .omnify-generated/* path in tsconfig.json");
-        }
+      const pluginAliasResult = addPluginEnumAlias(rootDir);
+      if (pluginAliasResult.updated) {
+        logger.success("Auto-configured @omnify-base alias in vite.config");
+      }
+      const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+      if (pluginPathResult.updated) {
+        logger.success("Auto-configured @omnify-base/* path in tsconfig.json");
       }
       if ((0, import_omnify_typescript.shouldGenerateAIGuides)(rootDir)) {
         const tsAIResult = (0, import_omnify_typescript.generateAIGuides)(rootDir, {

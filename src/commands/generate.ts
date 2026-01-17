@@ -43,7 +43,7 @@ import {
   generateFactories,
   getFactoryPath,
 } from '@famgia/omnify-laravel';
-import { generateTypeScript, copyStubs, generateAIGuides as generateTypescriptAIGuides, shouldGenerateAIGuides as shouldGenerateTypescriptAIGuides } from '@famgia/omnify-typescript';
+import { generateTypeScript, generateAIGuides as generateTypescriptAIGuides, shouldGenerateAIGuides as shouldGenerateTypescriptAIGuides } from '@famgia/omnify-typescript';
 import type {
   OmnifyPlugin,
   SchemaCollection,
@@ -582,10 +582,10 @@ function runDirectGeneration(
     const schemasDir = resolve(basePath, tsConfig.schemasDir ?? 'schemas');
     const enumDir = resolve(basePath, tsConfig.enumDir ?? 'enum');
 
-    // Generated files go to node_modules/@omnify-client (auto-generated)
-    const omnifyClientDir = resolve(rootDir, 'node_modules/@omnify-client');
-    const pluginEnumDir = resolve(omnifyClientDir, 'enum');
-    const baseSchemasDir = resolve(omnifyClientDir, 'schemas');
+    // Generated files go to node_modules/@omnify-base (auto-generated)
+    const omnifyBaseDir = resolve(rootDir, 'node_modules/@omnify-base');
+    const pluginEnumDir = resolve(omnifyBaseDir, 'enum');
+    const baseSchemasDir = resolve(omnifyBaseDir, 'schemas');
 
     // Calculate enum import prefix (relative path from schemas to enum)
     const enumImportPrefix = relative(schemasDir, enumDir).replace(/\\/g, '/');
@@ -608,11 +608,11 @@ function runDirectGeneration(
       logger.debug(`Created directory: ${baseSchemasDir}`);
     }
 
-    // Create package.json for @omnify-client package
-    const omnifyPkgJson = resolve(omnifyClientDir, 'package.json');
+    // Create package.json for @omnify-base package
+    const omnifyPkgJson = resolve(omnifyBaseDir, 'package.json');
     if (!existsSync(omnifyPkgJson)) {
       writeFileSync(omnifyPkgJson, JSON.stringify({
-        name: '@omnify-client',
+        name: '@omnify-base',
         version: '0.0.0',
         private: true,
         exports: {
@@ -632,8 +632,8 @@ function runDirectGeneration(
       generateRules: tsConfig.generateRules ?? true,
       validationTemplates: tsConfig.validationTemplates,
       enumImportPrefix,
-      pluginEnumImportPrefix: '@omnify-client/enum',
-      baseImportPrefix: '@omnify-client/schemas',
+      pluginEnumImportPrefix: '@omnify-base/enum',
+      baseImportPrefix: '@omnify-base/schemas',
       schemaEnumImportPrefix: '@omnify/enum', // Absolute path for node_modules base files
     });
 
@@ -645,7 +645,7 @@ function runDirectGeneration(
       if (file.category === 'plugin-enum') {
         outputDir = pluginEnumDir;
       } else if (file.category === 'base') {
-        // Base files go to node_modules/@omnify-client/schemas/
+        // Base files go to node_modules/@omnify-base/schemas/
         outputDir = baseSchemasDir;
         // Remove 'base/' prefix from filePath since we're already in schemas/
         outputFilePath = file.filePath.replace(/^base\//, '');
@@ -671,15 +671,6 @@ function runDirectGeneration(
 
     logger.success(`Generated ${typesGenerated} TypeScript file(s)`);
 
-    // Copy React utility stubs (components, hooks, lib)
-    const stubsResult = copyStubs({
-      targetDir: basePath,
-      skipIfExists: true,
-    });
-    if (stubsResult.copied.length > 0) {
-      logger.success(`Generated ${stubsResult.copied.length} React stub(s)`);
-    }
-
     // Auto-configure @omnify alias (silent mode - only log if changes made)
     const aliasResult = configureOmnifyAlias(rootDir, tsConfig.path, true);
     if (aliasResult.viteUpdated) {
@@ -689,16 +680,14 @@ function runDirectGeneration(
       logger.success('Auto-configured @omnify/* path in tsconfig.json');
     }
 
-    // Configure @omnify-client alias for plugin enums (if there are plugin enums)
-    if (pluginEnumsMap.size > 0) {
-      const pluginAliasResult = addPluginEnumAlias(rootDir);
-      if (pluginAliasResult.updated) {
-        logger.success('Auto-configured @omnify-client alias in vite.config');
-      }
-      const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
-      if (pluginPathResult.updated) {
-        logger.success('Auto-configured @omnify-client/* path in tsconfig.json');
-      }
+    // Configure @omnify-base alias (always needed for base schemas, enums, common, i18n)
+    const pluginAliasResult = addPluginEnumAlias(rootDir);
+    if (pluginAliasResult.updated) {
+      logger.success('Auto-configured @omnify-base alias in vite.config');
+    }
+    const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+    if (pluginPathResult.updated) {
+      logger.success('Auto-configured @omnify-base/* path in tsconfig.json');
     }
   }
 
@@ -933,16 +922,61 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       }
     }
 
-    // Offer to regenerate missing files
-    if (migrationValidation.missingFiles.length > 0) {
+    // Regenerate missing CREATE migration files
+    if (migrationValidation.missingFiles.length > 0 && config.output.laravel) {
       const toRegenerate = getMigrationsToRegenerate(existingLock, migrationValidation.missingFiles);
 
       if (toRegenerate.length > 0) {
-        logger.info(`Will regenerate ${toRegenerate.length} missing migration(s) with original timestamps.`);
+        const createMigrations = toRegenerate.filter(m => m.type === 'create');
+        const alterMigrations = toRegenerate.filter(m => m.type === 'alter' || m.type === 'drop');
 
-        // Add regeneration logic here in the future
-        // For now, we just warn - actual regeneration requires more work
-        logger.warn('Auto-regeneration not yet implemented. Please restore from git or reset migrations.');
+        if (createMigrations.length > 0) {
+          logger.info(`Regenerating ${createMigrations.length} missing CREATE migration(s) with original timestamps...`);
+          const migrationsDir = resolve(rootDir, config.output.laravel.migrationsPath);
+
+          // Extract custom types for generation
+          const customTypesMap = new Map<string, import('@famgia/omnify-types').CustomTypeDefinition>();
+          for (const plugin of config.plugins) {
+            if (plugin.types) {
+              for (const [typeName, typeDef] of Object.entries(plugin.types)) {
+                customTypesMap.set(typeName, typeDef);
+              }
+            }
+          }
+
+          for (const migData of createMigrations) {
+            // Find schema(s) for this migration
+            const migrationSchemas = Object.fromEntries(
+              Object.entries(schemas).filter(([name]) => migData.schemas.includes(name))
+            ) as SchemaCollection;
+
+            if (Object.keys(migrationSchemas).length === 0) {
+              logger.warn(`  Cannot regenerate ${migData.fileName}: schema not found`);
+              continue;
+            }
+
+            // Regenerate with original timestamp
+            const regenerated = generateMigrations(migrationSchemas, {
+              timestamp: migData.timestamp,
+              customTypes: customTypesMap,
+            });
+
+            for (const mig of regenerated) {
+              // Use the original filename to maintain consistency
+              const filePath = resolve(migrationsDir, migData.fileName);
+              writeFileSync(filePath, mig.content);
+              logger.success(`  Regenerated: ${migData.fileName}`);
+            }
+          }
+        }
+
+        if (alterMigrations.length > 0) {
+          logger.warn(`Cannot regenerate ${alterMigrations.length} ALTER/DROP migration(s) - original change data not available.`);
+          logger.warn('  Please restore these files from git or reset migrations with: npx omnify reset');
+          for (const m of alterMigrations) {
+            logger.warn(`    - ${m.fileName}`);
+          }
+        }
       }
     }
   }
@@ -1039,10 +1073,10 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       const schemasDir2 = resolve(basePath2, tsConfig2.schemasDir ?? 'schemas');
       const enumDir2 = resolve(basePath2, tsConfig2.enumDir ?? 'enum');
 
-      // Generated files go to node_modules/@omnify-client (auto-generated)
-      const omnifyClientDir2 = resolve(rootDir, 'node_modules/@omnify-client');
-      const pluginEnumDir2 = resolve(omnifyClientDir2, 'enum');
-      const baseSchemasDir2 = resolve(omnifyClientDir2, 'schemas');
+      // Generated files go to node_modules/@omnify-base (auto-generated)
+      const omnifyBaseDir2 = resolve(rootDir, 'node_modules/@omnify-base');
+      const pluginEnumDir2 = resolve(omnifyBaseDir2, 'enum');
+      const baseSchemasDir2 = resolve(omnifyBaseDir2, 'schemas');
 
       // Calculate enum import prefix (relative path from schemas to enum)
       const enumImportPrefix2 = relative(schemasDir2, enumDir2).replace(/\\/g, '/');
@@ -1065,11 +1099,11 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         logger.debug(`Created directory: ${baseSchemasDir2}`);
       }
 
-      // Create package.json for @omnify-client package
-      const omnifyPkgJson2 = resolve(omnifyClientDir2, 'package.json');
+      // Create package.json for @omnify-base package
+      const omnifyPkgJson2 = resolve(omnifyBaseDir2, 'package.json');
       if (!existsSync(omnifyPkgJson2)) {
         writeFileSync(omnifyPkgJson2, JSON.stringify({
-          name: '@omnify-client',
+          name: '@omnify-base',
           version: '0.0.0',
           private: true,
           exports: {
@@ -1089,8 +1123,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         generateRules: tsConfig2.generateRules ?? true,
         validationTemplates: tsConfig2.validationTemplates,
         enumImportPrefix: enumImportPrefix2,
-        pluginEnumImportPrefix: '@omnify-client/enum',
-        baseImportPrefix: '@omnify-client/schemas',
+        pluginEnumImportPrefix: '@omnify-base/enum',
+        baseImportPrefix: '@omnify-base/schemas',
         schemaEnumImportPrefix: '@omnify/enum', // Absolute path for node_modules base files
       });
 
@@ -1102,7 +1136,7 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         if (file.category === 'plugin-enum') {
           outputDir2 = pluginEnumDir2;
         } else if (file.category === 'base') {
-          // Base files go to node_modules/@omnify-client/schemas/
+          // Base files go to node_modules/@omnify-base/schemas/
           outputDir2 = baseSchemasDir2;
           // Remove 'base/' prefix from filePath since we're already in schemas/
           outputFilePath2 = file.filePath.replace(/^base\//, '');
@@ -1128,15 +1162,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
       logger.success(`Generated ${typesGenerated} TypeScript file(s)`);
 
-      // Copy React utility stubs (components, hooks, lib)
-      const stubsResult2 = copyStubs({
-        targetDir: basePath2,
-        skipIfExists: true,
-      });
-      if (stubsResult2.copied.length > 0) {
-        logger.success(`Generated ${stubsResult2.copied.length} React stub(s)`);
-      }
-
       // Auto-configure @omnify alias (silent mode - only log if changes made)
       const aliasResult = configureOmnifyAlias(rootDir, tsConfig2.path, true);
       if (aliasResult.viteUpdated) {
@@ -1146,16 +1171,14 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
         logger.success('Auto-configured @omnify/* path in tsconfig.json');
       }
 
-      // Configure .omnify-generated alias for plugin enums (if there are plugin enums)
-      if (pluginEnumsMap.size > 0) {
-        const pluginAliasResult = addPluginEnumAlias(rootDir);
-        if (pluginAliasResult.updated) {
-          logger.success('Auto-configured @omnify-client alias in vite.config');
-        }
-        const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
-        if (pluginPathResult.updated) {
-          logger.success('Auto-configured .omnify-generated/* path in tsconfig.json');
-        }
+      // Configure @omnify-base alias (always needed for base schemas, enums, common, i18n)
+      const pluginAliasResult = addPluginEnumAlias(rootDir);
+      if (pluginAliasResult.updated) {
+        logger.success('Auto-configured @omnify-base alias in vite.config');
+      }
+      const pluginPathResult = addPluginEnumTsconfigPath(rootDir);
+      if (pluginPathResult.updated) {
+        logger.success('Auto-configured @omnify-base/* path in tsconfig.json');
       }
 
       // Generate TypeScript AI guides if needed
