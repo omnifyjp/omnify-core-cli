@@ -162,7 +162,7 @@ export async function runInit(options: InitOptions): Promise<void> {
       database: 'mysql',
       migrationTool: 'laravel',
       generateTypes: true,
-      migrationsPath: 'database/migrations',
+      migrationsPath: 'database/migrations/omnify',
       typesPath: 'resources/js/types',
       schemasDir: './schemas',
     };
@@ -201,8 +201,9 @@ export async function runInit(options: InitOptions): Promise<void> {
     });
 
     // Default paths based on migration tool
+    // Note: Laravel uses /omnify subfolder to separate auto-generated migrations from manual ones
     const defaultPaths: Record<MigrationTool, { migrations: string; types: string }> = {
-      laravel: { migrations: 'database/migrations', types: 'resources/js/types' },
+      laravel: { migrations: 'database/migrations/omnify', types: 'resources/js/types' },
       prisma: { migrations: 'prisma/migrations', types: 'src/types' },
       drizzle: { migrations: 'drizzle', types: 'src/types' },
       none: { migrations: '', types: 'types' },

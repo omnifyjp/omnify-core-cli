@@ -348,7 +348,7 @@ async function resolveConfig(userConfig, configPath) {
   };
   const database = userConfig.database.devUrl !== void 0 ? { ...databaseConfig, devUrl: userConfig.database.devUrl } : databaseConfig;
   const laravelConfig = {
-    migrationsPath: userConfig.output?.laravel?.migrationsPath ?? "database/migrations"
+    migrationsPath: userConfig.output?.laravel?.migrationsPath ?? "database/migrations/omnify"
   };
   const laravel = buildLaravelConfig(laravelConfig, userConfig.output?.laravel);
   const tsConfig = userConfig.output?.typescript;
@@ -792,7 +792,7 @@ async function runInit(options) {
       database: "mysql",
       migrationTool: "laravel",
       generateTypes: true,
-      migrationsPath: "database/migrations",
+      migrationsPath: "database/migrations/omnify",
       typesPath: "resources/js/types",
       schemasDir: "./schemas"
     };
@@ -823,7 +823,7 @@ async function runInit(options) {
       default: true
     });
     const defaultPaths = {
-      laravel: { migrations: "database/migrations", types: "resources/js/types" },
+      laravel: { migrations: "database/migrations/omnify", types: "resources/js/types" },
       prisma: { migrations: "prisma/migrations", types: "src/types" },
       drizzle: { migrations: "drizzle", types: "src/types" },
       none: { migrations: "", types: "types" }

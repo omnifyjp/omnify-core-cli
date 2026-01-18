@@ -142,8 +142,10 @@ export async function resolveConfig(
     : databaseConfig;
 
   // Build laravel output config
+  // Default to 'database/migrations/omnify' to match the laravel plugin default
+  // This ensures reset command only deletes the omnify subfolder, not the entire migrations folder
   const laravelConfig = {
-    migrationsPath: userConfig.output?.laravel?.migrationsPath ?? 'database/migrations',
+    migrationsPath: userConfig.output?.laravel?.migrationsPath ?? 'database/migrations/omnify',
   };
   // Only add optional properties if they are defined
   const laravel = buildLaravelConfig(laravelConfig, userConfig.output?.laravel);

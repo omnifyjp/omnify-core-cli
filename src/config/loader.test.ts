@@ -73,7 +73,7 @@ describe('Config Loader', () => {
 
       expect(result.schemasDir).toBe('./schemas');
       expect(result.database.driver).toBe('mysql');
-      expect(result.output.laravel!.migrationsPath).toBe('database/migrations');
+      expect(result.output.laravel!.migrationsPath).toBe('database/migrations/omnify');
       expect(result.output.typescript!.path).toBe('types');
       expect(result.output.typescript!.singleFile).toBe(true);
       expect(result.verbose).toBe(false);
