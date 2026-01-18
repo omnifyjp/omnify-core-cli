@@ -1,6 +1,6 @@
 {
   "name": "@famgia/omnify-cli",
-  "version": "0.0.170",
+  "version": "0.0.171",
   "description": "CLI interface for omnify-schema",
   "type": "module",
   "bin": {
